@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="CE-3.8.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="ndiValidationFlow">
+		<message-filter onUnaccepted="invalidParameterNDIFlow"
+			doc:name="Message">
+			<and-filter>
+				<expression-filter expression="#[originalPayload['jukirID'] != null]" />
+				<expression-filter expression="#[originalPayload['jukirName'] != null]" />
+				<expression-filter expression="#[originalPayload['locationID'] != null]" />
+				<expression-filter expression="#[originalPayload['locationName'] != null]" />
+				<expression-filter expression="#[originalPayload['driverMsisdn'] != null]" />
+				<expression-filter expression="#[originalPayload['driverName'] != null]" />
+				<expression-filter expression="#[originalPayload['vehicleType'] != null]" />
+				<expression-filter expression="#[originalPayload['vehicleBrand'] != null]" />
+				<expression-filter
+					expression="#[originalPayload['vehicleLicensePlate'] != null]" />
+				<expression-filter expression="#[originalPayload['billingInvoiceID'] != null]" />
+				<expression-filter expression="#[originalPayload['billingAmount'] != null]" />
+				<expression-filter
+					expression="#[originalPayload['billingStartDateTime'] != null]" />
+				<expression-filter expression="#[originalPayload['billingDuration'] != null]" />
+				<expression-filter expression="#[originalPayload['bankCode'] != null]" />
+			</and-filter>
+		</message-filter>
+
+		<logger level="INFO" message="[GENERATE TICKET Validation = #[payload]]"
+			doc:name="Logger" />
+		<flow-ref name="generateTicketBPFlow" doc:name="Flow Reference" />
+	</flow>
+
+	<flow name="ndiNotifyValidationFlow">
+		<message-filter onUnaccepted="invalidParameterNDIFlow"
+			doc:name="Message">
+			<and-filter>
+				<expression-filter expression="#[originalPayload['InvoiceID'] != null]" />
+				<expression-filter expression="#[originalPayload['BankCode'] != null]" />
+			</and-filter>
+		</message-filter>
+
+		<logger level="INFO" message="[NDI NOTIFY Validation = #[payload]]"
+			doc:name="Logger" />
+		<flow-ref name="ndiNotifyBPFlow" doc:name="Flow Reference" />
+
+	</flow>
+</mule>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="CE-3.8.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="inquiryBPFlow">
+		<expression-component doc:name="Expression">
+			<![CDATA[
+			regMap = new java.util.HashMap();
+			regMap['methodType']= 'GET';			
+			regMap['name']= 'TicketIDMap';
+			regMap['key']= originalPayload['TicketID'];
+			payload = regMap;]]>
+		</expression-component>
+		<pooled-component>
+			<spring-object bean="CacheProcessor" />
+		</pooled-component>
+		<logger level="INFO" message="[CACHE INQUIRY Validation = #[payload]]"
+			doc:name="Logger" />
+
+		<choice>
+			<when expression="#[payload != null]">
+				<expression-component doc:name="Expression">
+					<![CDATA[
+						jukirMap = new java.util.HashMap();
+						jukirMap['id'] = payload['jukirID'];
+						jukirMap['name'] = payload['jukirName'];
+						
+						locationMap = new java.util.HashMap();
+						locationMap['id'] = payload['locationID'];
+						locationMap['name'] = payload['locationName'];
+						
+						driverMap = new java.util.HashMap();
+						driverMap['msisdn'] = payload['driverMsisdn'];
+						driverMap['name'] = payload['driverName'];
+						
+						vehicleMap = new java.util.HashMap();
+						vehicleMap['licensePlate'] = payload['vehicleLicensePlate'];
+						vehicleMap['type'] = payload['vehicleType'];	
+						vehicleMap['brand'] = payload['vehicleBrand'];
+						
+						billingMap = new java.util.HashMap();
+						billingMap['duration'] = payload['billingDuration'];
+						billingMap['amount'] = payload['billingAmount'];	
+						billingMap['startDateTime'] = payload['billingStartDateTime'];	
+						billingMap['invoiceID'] = payload['billingInvoiceID'];
+						
+						bankMap = new java.util.HashMap();
+						bankMap['bankID'] = payload['bankID'];
+						bankMap['bankCode'] = payload['bankCode'];
+						bankMap['bankName'] = payload['bankName'];
+						
+						allMap = new java.util.HashMap();
+						allMap['jukir'] = jukirMap;
+						allMap['location'] = locationMap;	
+						allMap['driver'] = driverMap;	
+						allMap['vehicle'] = vehicleMap;
+						allMap['billing'] = billingMap;
+						allMap['bank'] = bankMap;
+						allMap['status'] = 'PROCESSED';
+						
+						responseMap = new java.util.HashMap();
+						responseMap['InquiryResponse'] = [allMap];
+					payload = responseMap;]]>
+				</expression-component>
+			</when>
+			<otherwise>
+				<db:select config-ref="MySQL_Configuration" doc:name="Database">
+					<db:parameterized-query>
+						<![CDATA[SELECT b.invoice_id, b.amount, b.start_date, b.duration, b.vehicle_brand, b.vehicle_license_plate, b.vehicle_type,
+							b.transaction_number, l.location_id, l.name as location, d.msisdn, d.name as driver,
+						    p.parking_officer_id, p.name as po, bk.id as bankID, bk.code as bankCode, bk.name as bankName, bk.url as bankUrl						    
+						    FROM on_street_parking.billing b
+						INNER JOIN on_street_parking.location l ON b.location_id=l.id
+						INNER JOIN on_street_parking.driver d ON b.driver_id=d.id
+						INNER JOIN on_street_parking.parking_officer p ON b.parking_officer_id=p.id
+						INNER JOIN on_street_parking.bank bk ON b.bank_id=bk.id
+						WHERE b.ticket_id=#[originalPayload['TicketID']]]]>
+					</db:parameterized-query>
+				</db:select>
+				<logger level="INFO" message="#[payload]" />
+				<choice>
+					<when expression="#[payload == []]">
+						<expression-component doc:name="Expression">
+							<![CDATA[
+								allMap = new java.util.HashMap();
+								allMap['status'] = 'INVALID_TICKET_ID';	
+								
+								responseMap = new java.util.HashMap();
+								responseMap['InquiryResponse'] = [allMap];
+							payload = responseMap;]]>
+						</expression-component>
+					</when>
+					<otherwise>
+						<set-variable value="#[payload.get(0)['bankID']]"
+							variableName="bankID" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['bankCode']]"
+							variableName="bankCode" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['bankName']]"
+							variableName="bankName" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['bankUrl']]"
+							variableName="bankUrl" doc:name="Variable" />
+						
+						<set-variable value="#[payload.get(0)['invoice_id']]"
+							variableName="billingInvoiceID" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['duration']]"
+							variableName="billingDuration" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['amount']]"
+							variableName="billingAmount" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['start_date']]"
+							variableName="billingStartDateTime" doc:name="Variable" />
+
+						<set-variable value="#[payload.get(0)['vehicle_brand']]"
+							variableName="vehicleBrand" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['vehicle_type']]"
+							variableName="vehicleType" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['vehicle_license_plate']]"
+							variableName="vehicleLicensePlate" doc:name="Variable" />
+
+						<set-variable value="#[payload.get(0)['driver']]"
+							variableName="driverName" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['msisdn']]"
+							variableName="driverMsisdn" doc:name="Variable" />
+
+						<set-variable value="#[payload.get(0)['location_id']]"
+							variableName="locationID" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['location']]"
+							variableName="locationName" doc:name="Variable" />
+
+						<set-variable value="#[payload.get(0)['parking_officer_id']]"
+							variableName="jukirID" doc:name="Variable" />
+						<set-variable value="#[payload.get(0)['po']]"
+							variableName="jukirName" doc:name="Variable" />
+
+						<expression-component doc:name="Expression">
+							<![CDATA[
+								jukirMap = new java.util.HashMap();
+								jukirMap['id'] = flowVars['jukirID'];
+								jukirMap['name'] = flowVars['jukirName'];
+								
+								locationMap = new java.util.HashMap();
+								locationMap['id'] = flowVars['locationID'];
+								locationMap['name'] = flowVars['locationName'];
+								
+								driverMap = new java.util.HashMap();
+								driverMap['msisdn'] = flowVars['driverMsisdn'];
+								driverMap['name'] = flowVars['driverName'];
+								
+								vehicleMap = new java.util.HashMap();
+								vehicleMap['licensePlate'] = flowVars['vehicleLicensePlate'];
+								vehicleMap['type'] = flowVars['vehicleType'];	
+								vehicleMap['brand'] = flowVars['vehicleBrand'];
+								
+								billingMap = new java.util.HashMap();
+								billingMap['duration'] = flowVars['billingDuration'];
+								billingMap['amount'] = flowVars['billingAmount'];	
+								billingMap['startDateTime'] = flowVars['billingStartDateTime'];	
+								billingMap['invoiceID'] = flowVars['billingInvoiceID'];
+								
+								bankMap = new java.util.HashMap();
+								bankMap['bankID'] = payload['bankID'];
+								bankMap['bankCode'] = payload['bankCode'];
+								bankMap['bankName'] = payload['bankName'];
+								
+								allMap = new java.util.HashMap();
+								allMap['jukir'] = jukirMap;
+								allMap['location'] = locationMap;	
+								allMap['driver'] = driverMap;	
+								allMap['vehicle'] = vehicleMap;
+								allMap['billing'] = billingMap;
+								allMap['bank'] = bankMap;
+								allMap['status'] = 'PROCESSED';
+								
+								responseMap = new java.util.HashMap();
+								responseMap['InquiryResponse'] = [allMap];
+							payload = responseMap;]]>
+						</expression-component>
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

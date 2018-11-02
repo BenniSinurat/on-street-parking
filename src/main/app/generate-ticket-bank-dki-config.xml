@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="CE-3.8.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="generateTicketBankDKIBPFlow">
+		<db:insert config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[INSERT INTO on_street_parking.parking_officer (parking_officer_id, name, modified_date) 
+							VALUES(#[originalPayload['jukirID']], #[originalPayload['jukirName']], NOW()) 
+							ON DUPLICATE KEY UPDATE    
+							parking_officer_id=#[originalPayload['jukirID']], name=#[originalPayload['jukirName']]]]>
+			</db:parameterized-query>
+		</db:insert>
+		<message-filter onUnaccepted="dbFailedFlow" doc:name="Message">
+			<expression-filter expression="#[payload == 1]" />
+		</message-filter>
+		<db:select config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[SELECT id FROM on_street_parking.parking_officer  
+							WHERE parking_officer_id=#[originalPayload['jukirID']]]]>
+			</db:parameterized-query>
+		</db:select>
+		<message-filter onUnaccepted="dataNotFoundFlow"
+			doc:name="Message">
+			<expression-filter expression="#[payload != []]" />
+		</message-filter>
+		<set-variable value="#[payload.get(0)['id']]"
+			variableName="jukir_id" doc:name="Variable" />
+		<db:insert config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[INSERT INTO on_street_parking.driver (name, msisdn, modified_date) 
+							VALUES(#[originalPayload['driverName']], #[originalPayload['driverMsisdn']], NOW()) 
+							ON DUPLICATE KEY UPDATE    
+							name=#[originalPayload['driverName']], msisdn=#[originalPayload['driverMsisdn']]]]>
+			</db:parameterized-query>
+		</db:insert>
+		<message-filter onUnaccepted="dbFailedFlow" doc:name="Message">
+			<expression-filter expression="#[payload == 1]" />
+		</message-filter>
+		<db:select config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[SELECT id FROM on_street_parking.driver  
+							WHERE name=#[originalPayload['driverName']] AND msisdn=#[originalPayload['driverMsisdn']]]]>
+			</db:parameterized-query>
+		</db:select>
+		<message-filter onUnaccepted="dataNotFoundFlow"
+			doc:name="Message">
+			<expression-filter expression="#[payload != []]" />
+		</message-filter>
+		<set-variable value="#[payload.get(0)['id']]"
+			variableName="driver_id" doc:name="Variable" />
+		<db:insert config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[INSERT INTO on_street_parking.location(location_id, name, modified_date) 
+							VALUES(#[originalPayload['locationID']], #[originalPayload['locationName']], NOW()) 
+							ON DUPLICATE KEY UPDATE    
+							location_id=#[originalPayload['locationID']], name=#[originalPayload['locationName']]]]>
+			</db:parameterized-query>
+		</db:insert>
+		<message-filter onUnaccepted="dbFailedFlow" doc:name="Message">
+			<expression-filter expression="#[payload == 1]" />
+		</message-filter>
+		<db:select config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[SELECT id FROM on_street_parking.location  
+							WHERE location_id=#[originalPayload['locationID']] AND name=#[originalPayload['locationName']]]]>
+			</db:parameterized-query>
+		</db:select>
+		<message-filter onUnaccepted="dataNotFoundFlow"
+			doc:name="Message">
+			<expression-filter expression="#[payload != []]" />
+		</message-filter>
+		<set-variable value="#[payload.get(0)['id']]"
+			variableName="location_id" doc:name="Variable" />
+		<db:insert config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[INSERT INTO on_street_parking.billing (parking_officer_id, driver_id, location_id, invoice_id, amount, start_date, duration, status, vehicle_brand, vehicle_license_plate, vehicle_type, ticket_id, bank_id)
+					VALUES(#[flowVars['jukir_id']], #[flowVars['driver_id']], #[flowVars['location_id']], #[originalPayload['billingInvoiceID']], #[originalPayload['billingAmount']], #[originalPayload['billingStartDateTime']], #[originalPayload['billingDuration']],
+					'PENDING', #[originalPayload['vehicleBrand']], #[originalPayload['vehicleLicensePlate']], #[originalPayload['vehicleType']], #[flowVars['correlationID']], #[flowVars['bank_id']])]]>
+			</db:parameterized-query>
+		</db:insert>
+		<message-filter onUnaccepted="dbFailedFlow" doc:name="Message">
+			<expression-filter expression="#[payload == 1]" />
+		</message-filter>
+		<logger level="INFO"
+			message="ORIGINAL PAYLOAD : #[flowVars['originalPayload']]" />
+
+		<expression-component doc:name="Expression">
+			<![CDATA[reqMap = new java.util.HashMap();
+				reqMap['driverMsisdn'] = originalPayload['driverMsisdn'];
+				reqMap['billingAmount'] = originalPayload['billingAmount'];	
+				reqMap['ticketID'] = flowVars['correlationID'];
+			payload = reqMap;]]>
+		</expression-component>
+		<pooled-component>
+			<spring-object bean="GenerateQRData" />
+		</pooled-component>
+
+		<set-variable value="#[payload]" variableName="qrdata"
+			doc:name="Variable" />
+	</flow>
+</mule>

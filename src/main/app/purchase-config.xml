@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="CE-3.8.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="purchaseBPFlow">
+		<set-variable value="#[originalPayload['TransactionNumber']]"
+			variableName="TransactionNumber" doc:name="Variable" />
+
+		<db:select config-ref="MySQL_Configuration" doc:name="Database">
+			<db:parameterized-query>
+				<![CDATA[SELECT * FROM on_street_parking.billing 
+								WHERE billing_number=#[originalPayload['TicketID']] AND amount=#[originalPayload['Amount']] 
+									AND transaction_number=#[originalPayload['TransactionNumber']]]]>
+			</db:parameterized-query>
+		</db:select>
+		<logger level="INFO" message="VALIDATION ticket_id = #[payload]" />
+		<choice>
+			<when expression="#[payload == []]">
+				<db:insert config-ref="MySQL_Configuration" doc:name="Database">
+					<db:parameterized-query>
+						<![CDATA[INSERT INTO on_street_parking.billing (billing_number, transaction_number, amount)
+							VALUES(#[originalPayload['TicketID']], #[originalPayload['TransactionNumber']], #[originalPayload['Amount']])]]>
+					</db:parameterized-query>
+				</db:insert>
+				<choice>
+					<when expression="#[payload == 1]">
+						<set-variable value="PROCESSED" variableName="status" />
+					</when>
+					<otherwise>
+						<set-variable value="FAILED" variableName="status" />
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise>
+				<set-variable variableName="status" value="FAILED"
+					doc:name="Variable" />
+			</otherwise>
+		</choice>
+
+		<expression-component doc:name="Expression"> 
+			<![CDATA[ allMap = new java.util.HashMap(); 
+				allMap['status'] = flowVars['status']; 
+					
+				responseMap = new java.util.HashMap(); 
+				responseMap['PurchaseResponse'] = [allMap]; 
+			payload = responseMap;]]>
+		</expression-component>
+	</flow>
+</mule>

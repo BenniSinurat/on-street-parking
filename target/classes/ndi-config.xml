@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="CE-3.8.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="generateTicketConfigFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="GenerateTicket" allowedMethods="POST" doc:name="HTTP">
+		</http:listener>
+		<message-filter doc:name="Filter favicon">
+			<not-filter>
+				<wildcard-filter pattern="/favicon.ico"
+					caseSensitive="true" />
+			</not-filter>
+		</message-filter>
+
+		<set-variable value="#[message.inboundProperties.'http.method']"
+			variableName="method" doc:name="Variable" />
+		<set-variable variableName="originalPayload" value="#[payload]"
+			doc:name="Variable" />
+
+		<!-- <set-variable value="#[message.id]" variableName="correlationID"
+			doc:name="Variable" /> -->
+
+		<logger level="INFO"
+			message="[GENERATE TICKET Request = #[flowVars['originalPayload']] ]"
+			doc:name="Logger" />
+		<flow-ref name="ndiValidationFlow" />
+
+		<json:object-to-json-transformer
+			doc:name="Object to JSON" />
+		<exception-strategy ref="sessionException"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+	
+	<flow name="ndiNotifyConfigFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration2"
+			path="NotificationNDI" allowedMethods="POST" doc:name="HTTP">
+		</http:listener>
+		<message-filter doc:name="Filter favicon">
+			<not-filter>
+				<wildcard-filter pattern="/favicon.ico"
+					caseSensitive="true" />
+			</not-filter>
+		</message-filter>
+
+		<set-variable value="#[message.inboundProperties.'http.method']"
+			variableName="method" doc:name="Variable" />
+		<set-variable variableName="originalPayload" value="#[payload]"
+			doc:name="Variable" />
+
+		<set-variable value="#[message.id]" variableName="correlationID"
+			doc:name="Variable" />
+
+		<logger level="INFO"
+			message="[{#[correlationID]} : NDI Notification Request = #[flowVars['originalPayload']] ]"
+			doc:name="Logger" />
+		<flow-ref name="ndiNotifyValidationFlow" />
+
+		<json:object-to-json-transformer
+			doc:name="Object to JSON" />
+		<exception-strategy ref="sessionException"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+</mule>

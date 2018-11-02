@@ -1,0 +1,8 @@
+org/parking/api/services/TicketIDResponse.class
+org/parking/api/services/TicketIDRequest.class
+org/parking/api/data/BaseRepository.class
+org/parking/api/data/TicketIDDoc.class
+org/parking/api/process/GenerateQRData.class
+org/parking/api/process/Utils.class
+org/parking/api/process/CacheProcessor.class
+org/parking/api/process/Configurator.class
